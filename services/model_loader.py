@@ -24,7 +24,7 @@ def create_efficientnet_b0():
     return model
 
 @st.cache_resource
-def load_model(model_name: str) -> nn.Module:
+def load_model(model_name: str):
     logger.info(f"Bắt đầu tải mô hình: {model_name}")
     
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -51,14 +51,25 @@ def load_model(model_name: str) -> nn.Module:
             logger.info("Model loaded thành công.")
             return model
         except Exception as e:
-            logger.error(f"Lỗi khi load mô hình: {e}")
+            logger.error(f"Lỗi khi load mô hình PyTorch: {e}")
+            raise e
+    elif model_name == "CNN Custom":
+        model_path = os.path.join(models_dir, "Lan2_best_baseline_cnn_extreme_weights.keras")
+        if not os.path.exists(model_path):
+            logger.error(f"Không tìm thấy file mô hình tại: {model_path}")
+            raise FileNotFoundError(f"Không tìm thấy file trọng số {model_path}")
+            
+        try:
+            import tensorflow as tf
+            model = tf.keras.models.load_model(model_path, compile=False)
+            logger.info("Model Keras loaded thành công.")
+            return model
+        except Exception as e:
+            logger.error(f"Lỗi khi load mô hình Keras: {e}")
             raise e
     else:
         logger.error(f"Mô hình {model_name} chưa được hỗ trợ.")
         raise ValueError(f"Mô hình {model_name} hiện chưa được hỗ trợ.")
 
 def get_available_models():
-    """
-    Trả về danh sách các mô hình hiện có.
-    """
-    return ["EfficientNet-B0"]
+    return ["EfficientNet-B0", "CNN Custom"]

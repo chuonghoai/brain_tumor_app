@@ -76,3 +76,69 @@ class TorchGradCAM(BaseGradCAM):
             heatmap /= heatmap_max
             
         return heatmap
+
+class KerasGradCAM(BaseGradCAM):
+    def __init__(self, model):
+        super().__init__(model)
+        self.target_layer = self._find_target_layer()
+
+    def _find_target_layer(self):
+        try:
+            import tensorflow as tf
+        except ImportError:
+            return None
+            
+        # Ưu tiên tìm layer tên là 'bottleneck_conv'
+        for layer in reversed(self.model.layers):
+            if layer.name == 'bottleneck_conv':
+                return layer
+                
+        # Hoặc tìm Conv2D cuối cùng
+        for layer in reversed(self.model.layers):
+            if isinstance(layer, tf.keras.layers.Conv2D):
+                return layer
+        return None
+
+    def generate_heatmap(self, input_array: np.ndarray, target_class: int = None) -> np.ndarray:
+        if self.target_layer is None:
+            return None
+            
+        try:
+            import tensorflow as tf
+            
+            grad_model = tf.keras.models.Model(
+                [self.model.inputs],
+                [self.target_layer.output, self.model.output]
+            )
+
+            with tf.GradientTape() as tape:
+                inputs = tf.cast(input_array, tf.float32)
+                conv_outputs, predictions = grad_model(inputs)
+                
+                if target_class is None:
+                    target_class = tf.argmax(predictions[0])
+                    
+                if len(predictions[0]) == 1:
+                    loss = predictions[:, 0]
+                else:
+                    loss = predictions[:, target_class]
+
+            grads = tape.gradient(loss, conv_outputs)
+            
+            # Global Average Pooling on gradients (axis 0 is batch, 1 is H, 2 is W, 3 is Channels)
+            pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+            
+            conv_outputs = conv_outputs[0]
+            heatmap = conv_outputs @ tf.expand_dims(pooled_grads, axis=-1)
+            heatmap = tf.squeeze(heatmap)
+            
+            heatmap = tf.maximum(heatmap, 0)
+            max_val = tf.math.reduce_max(heatmap)
+            if max_val != 0:
+                heatmap = heatmap / max_val
+            return heatmap.numpy()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger("KerasGradCAM")
+            logger.error(f"Lỗi khi tính Keras Grad-CAM: {e}")
+            return None

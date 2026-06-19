@@ -25,9 +25,12 @@ if "model_ready" not in st.session_state:
 
 # Kiểm tra file model đã tồn tại trong session chưa
 def check_model_exists(model_name: str) -> bool:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     if model_name == "EfficientNet-B0":
-        base_dir = os.path.dirname(os.path.abspath(__file__))
         model_path = os.path.join(base_dir, "models", "best_efficientnet_b0.pth")
+        return os.path.exists(model_path)
+    elif model_name == "CNN Custom":
+        model_path = os.path.join(base_dir, "models", "Lan2_best_baseline_cnn_extreme_weights.keras")
         return os.path.exists(model_path)
     return False
 st.session_state.model_ready = check_model_exists(st.session_state.selected_model)

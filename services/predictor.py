@@ -6,9 +6,10 @@ import torch.nn.functional as F
 from PIL import Image
 
 from .utils import PredictionResult, setup_logger
-from .preprocessing import preprocess_image
+from .preprocessing import preprocess_image, preprocess_image_keras
 from .model_loader import load_model
-from .gradcam import TorchGradCAM
+from .gradcam import TorchGradCAM, KerasGradCAM
+import numpy as np
 
 logger = setup_logger("Predictor")
 
@@ -20,23 +21,32 @@ def predict(image: Image.Image, model_name: str) -> PredictionResult:
     try:
         # Load mô hình
         model = load_model(model_name)
-        device = next(model.parameters()).device
-        
-        # Tiền xử lý
-        input_tensor = preprocess_image(image).to(device)
         
         # Đo thời gian
         start_time = time.perf_counter()
         
-        # Suy luận
-        with torch.no_grad():
-            output = model(input_tensor)
-            probabilities = F.softmax(output, dim=1)[0].cpu().numpy()
+        if model_name == "EfficientNet-B0":
+            device = next(model.parameters()).device
+            input_tensor = preprocess_image(image).to(device)
+            
+            with torch.no_grad():
+                output = model(input_tensor)
+                probabilities = F.softmax(output, dim=1)[0].cpu().numpy()
+        elif model_name == "CNN Custom":
+            input_numpy = preprocess_image_keras(image)
+            output = model.predict(input_numpy, verbose=0)
+            output_flat = output[0]
+            if len(output_flat) == 1:
+                prob_tumor = float(output_flat[0])
+                prob_notumor = 1.0 - prob_tumor
+                probabilities = np.array([prob_notumor, prob_tumor])
+            else:
+                exp_vals = np.exp(output_flat - np.max(output_flat))
+                probabilities = exp_vals / np.sum(exp_vals)
             
         end_time = time.perf_counter()
         inference_time = end_time - start_time
         
-        # Lấy nhãn và độ tin cậy
         pred_idx = probabilities.argmax()
         prediction_label = CLASS_NAMES[pred_idx]
         confidence = float(probabilities[pred_idx])
@@ -50,10 +60,15 @@ def predict(image: Image.Image, model_name: str) -> PredictionResult:
         logger.info("Bắt đầu tạo ảnh nhiệt (Heatmap generated).")
         
         # Grad-CAM
-        gradcam = TorchGradCAM(model)
-        input_tensor.requires_grad = True
-        heatmap = gradcam.generate_heatmap(input_tensor, target_class=pred_idx)
-        overlayed_img = gradcam.overlay_heatmap(image, heatmap, alpha=0.4)
+        if model_name == "EfficientNet-B0":
+            gradcam = TorchGradCAM(model)
+            input_tensor.requires_grad = True
+            heatmap = gradcam.generate_heatmap(input_tensor, target_class=pred_idx)
+        elif model_name == "CNN Custom":
+            gradcam = KerasGradCAM(model)
+            heatmap = gradcam.generate_heatmap(input_numpy, target_class=pred_idx)
+            
+        overlayed_img = gradcam.overlay_heatmap(image, heatmap, alpha=0.4) if heatmap is not None else None
         
         logger.info("Hoàn tất quy trình suy luận (Prediction finished).")
         

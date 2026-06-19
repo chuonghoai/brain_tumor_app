@@ -12,9 +12,6 @@ from .utils import setup_logger
 logger = setup_logger("ModelLoader")
 
 def create_efficientnet_b0():
-    """
-    Khởi tạo kiến trúc mạng EfficientNet-B0 giống hệt lúc huấn luyện.
-    """
     model = efficientnet_b0()
     in_features = model.classifier[1].in_features
     model.classifier = nn.Sequential(
@@ -28,26 +25,14 @@ def create_efficientnet_b0():
 
 @st.cache_resource
 def load_model(model_name: str) -> nn.Module:
-    """
-    Tải và cache mô hình dựa trên tên.
-    Hỗ trợ dễ dàng mở rộng thêm mô hình trong tương lai.
-    
-    Args:
-        model_name (str): Tên mô hình cần tải.
-        
-    Returns:
-        nn.Module: Mô hình PyTorch đã được load trọng số.
-        
-    Raises:
-        FileNotFoundError: Nếu không tìm thấy file trọng số.
-        ValueError: Nếu model_name không được hỗ trợ.
-    """
     logger.info(f"Bắt đầu tải mô hình: {model_name}")
     
-    # Chỉ định đường dẫn tới thư mục models
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     models_dir = os.path.join(base_dir, "models")
     
+    """
+    Chọn model để phân tích ảnh
+    """
     if model_name == "EfficientNet-B0":
         model_path = os.path.join(models_dir, "best_efficientnet_b0.pth")
         
@@ -56,8 +41,6 @@ def load_model(model_name: str) -> nn.Module:
             raise FileNotFoundError(f"Không tìm thấy file trọng số {model_path}")
             
         model = create_efficientnet_b0()
-        
-        # Thiết lập thiết bị ưu tiên
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         try:
@@ -70,7 +53,6 @@ def load_model(model_name: str) -> nn.Module:
         except Exception as e:
             logger.error(f"Lỗi khi load mô hình: {e}")
             raise e
-            
     else:
         logger.error(f"Mô hình {model_name} chưa được hỗ trợ.")
         raise ValueError(f"Mô hình {model_name} hiện chưa được hỗ trợ.")

@@ -12,25 +12,9 @@ from .gradcam import TorchGradCAM
 
 logger = setup_logger("Predictor")
 
-# Lập bản đồ nhãn theo dữ liệu huấn luyện
 CLASS_NAMES = ["No Tumor", "Tumor"]
 
 def predict(image: Image.Image, model_name: str) -> PredictionResult:
-    """
-    Điều phối toàn bộ quá trình suy luận:
-    1. Tiền xử lý ảnh.
-    2. Gọi mô hình dự đoán.
-    3. Tính thời gian suy luận.
-    4. Sinh ảnh Grad-CAM.
-    5. Đóng gói kết quả.
-    
-    Args:
-        image (PIL.Image.Image): Ảnh MRI gốc.
-        model_name (str): Tên mô hình cần sử dụng.
-        
-    Returns:
-        PredictionResult: Kết quả dự đoán và Grad-CAM.
-    """
     logger.info("Bắt đầu quá trình suy luận (Prediction started).")
     
     try:
@@ -66,14 +50,9 @@ def predict(image: Image.Image, model_name: str) -> PredictionResult:
         logger.info("Bắt đầu tạo ảnh nhiệt (Heatmap generated).")
         
         # Grad-CAM
-        # Khởi tạo Grad-CAM, TorchGradCAM tự động tìm Conv2d cuối cùng
         gradcam = TorchGradCAM(model)
-        
-        # Do Grad-CAM yêu cầu backward pass, ta cần bật lại gradient cho input_tensor
         input_tensor.requires_grad = True
         heatmap = gradcam.generate_heatmap(input_tensor, target_class=pred_idx)
-        
-        # Phủ heatmap lên ảnh gốc
         overlayed_img = gradcam.overlay_heatmap(image, heatmap, alpha=0.4)
         
         logger.info("Hoàn tất quy trình suy luận (Prediction finished).")

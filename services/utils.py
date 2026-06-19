@@ -17,16 +17,6 @@ class PredictionResult:
 
 
 def setup_logger(name: str = "BrainTumorApp", level: int = logging.INFO) -> logging.Logger:
-    """
-    Cấu hình logging cho toàn bộ ứng dụng.
-
-    Args:
-        name (str): Tên logger.
-        level (int): Mức độ log.
-
-    Returns:
-        logging.Logger: Đối tượng logger đã cấu hình.
-    """
     logger = logging.getLogger(name)
     if not logger.handlers:
         logger.setLevel(level)
@@ -34,7 +24,6 @@ def setup_logger(name: str = "BrainTumorApp", level: int = logging.INFO) -> logg
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         
-        # Stream handler (console)
         ch = logging.StreamHandler()
         ch.setFormatter(formatter)
         logger.addHandler(ch)

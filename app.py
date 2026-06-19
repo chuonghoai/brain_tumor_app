@@ -7,17 +7,13 @@ from services.model_loader import get_available_models, load_model
 from services.predictor import predict
 
 logger = setup_logger("App")
-
-# ==========================================
-# Cấu hình trang
-# ==========================================
 st.set_page_config(
     page_title="Phát Hiện Khối U Não",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Khởi tạo session state
+# Init state
 if "uploaded_image" not in st.session_state:
     st.session_state.uploaded_image = None
 if "prediction_result" not in st.session_state:
@@ -27,29 +23,23 @@ if "selected_model" not in st.session_state:
 if "model_ready" not in st.session_state:
     st.session_state.model_ready = False
 
-# Kiểm tra file model
+# Kiểm tra file model đã tồn tại trong session chưa
 def check_model_exists(model_name: str) -> bool:
     if model_name == "EfficientNet-B0":
         base_dir = os.path.dirname(os.path.abspath(__file__))
         model_path = os.path.join(base_dir, "models", "best_efficientnet_b0.pth")
         return os.path.exists(model_path)
     return False
-
-# Cập nhật trạng thái model_ready ban đầu
 st.session_state.model_ready = check_model_exists(st.session_state.selected_model)
 
 def reset_session():
     st.session_state.uploaded_image = None
     st.session_state.prediction_result = None
 
-# ==========================================
-# Bố cục Header
-# ==========================================
+# Header
 header_left, header_right = st.columns([8, 1])
-
 with header_left:
     st.markdown("<h1 style='text-align: center;'>PHÁT HIỆN KHỐI U NÃO TRÊN ẢNH MRI</h1>", unsafe_allow_html=True)
-
 with header_right:
     if st.session_state.uploaded_image is not None:
         if st.button("Làm mới", use_container_width=True):
@@ -58,17 +48,15 @@ with header_right:
 
 st.markdown("---")
 
-# ==========================================
-# Bố cục Main Content
-# ==========================================
+# Main UI
 col_left, col_right = st.columns(2)
 
-# ----- Cột Trái (Khu vực Ảnh gốc) -----
+# Vùng tải ảnh lên
 with col_left:
     st.subheader("Tải ảnh MRI")
-    
+
     if st.session_state.uploaded_image is None:
-        # Trạng thái: Chưa có ảnh
+        # Chưa có ảnh
         uploaded_file = st.file_uploader(
             "Chọn ảnh MRI của bạn",
             type=["png", "jpg", "jpeg"]
@@ -84,20 +72,19 @@ with col_left:
                 st.error("Tập tin tải lên không hợp lệ hoặc bị lỗi. Vui lòng thử ảnh khác.")
                 logger.error(f"Lỗi khi đọc tập tin tải lên: {e}")
     else:
-        # Trạng thái: Đã có ảnh
+        # Đã có ảnh
         st.image(st.session_state.uploaded_image, use_container_width=True)
         if st.button("Xóa ảnh", use_container_width=True):
             reset_session()
             st.rerun()
 
-# ----- Cột Phải (Khu vực Phân tích & Kết quả) -----
+# Nút phân tích ảnh - Kết quả phân tích
 with col_right:
     if st.session_state.prediction_result is None:
-        # Trạng thái 1: Khi chưa phân tích
+        # Lúc ban đầu chưa bấm phân tích
         st.subheader("Điều khiển")
         
         available_models = get_available_models()
-        
         selected_model = st.selectbox(
             "Chọn mô hình",
             available_models,
@@ -130,11 +117,10 @@ with col_right:
                 logger.error(f"Lỗi khi xử lý predict: {e}")
                 
     else:
-        # Trạng thái 2: Khi mô hình đã nhận diện xong
+        # Model đã phân tích xong ảnh
         st.subheader("Báo cáo Chẩn đoán")
         res = st.session_state.prediction_result
         
-        # Ảnh Grad-CAM
         if res.heatmap is not None:
             st.image(res.heatmap, use_container_width=True)
         else:
@@ -142,7 +128,7 @@ with col_right:
             
         st.markdown("---")
         
-        # Báo cáo kết quả
+        # Report
         metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
         with metrics_col1:
             st.metric(label="Kết luận", value=res.prediction)

@@ -7,7 +7,7 @@ from PIL import Image
 
 from .utils import PredictionResult, setup_logger
 from .preprocessing import preprocess_image, preprocess_image_keras
-from .model_loader import load_model
+from .model_loader import load_model, MODEL_CONFIG
 from .gradcam import TorchGradCAM, KerasGradCAM
 import numpy as np
 
@@ -25,14 +25,18 @@ def predict(image: Image.Image, model_name: str) -> PredictionResult:
         # Đo thời gian
         start_time = time.perf_counter()
         
-        if model_name == "EfficientNet-B0":
+        filename = MODEL_CONFIG.get(model_name, "")
+        is_pytorch = filename.endswith(".pth")
+        is_keras = filename.endswith(".keras")
+        
+        if is_pytorch:
             device = next(model.parameters()).device
             input_tensor = preprocess_image(image).to(device)
             
             with torch.no_grad():
                 output = model(input_tensor)
                 probabilities = F.softmax(output, dim=1)[0].cpu().numpy()
-        elif model_name == "CNN Custom":
+        elif is_keras:
             input_numpy = preprocess_image_keras(image)
             output = model.predict(input_numpy, verbose=0)
             output_flat = output[0]
@@ -43,6 +47,8 @@ def predict(image: Image.Image, model_name: str) -> PredictionResult:
             else:
                 exp_vals = np.exp(output_flat - np.max(output_flat))
                 probabilities = exp_vals / np.sum(exp_vals)
+        else:
+            raise ValueError(f"Không hỗ trợ định dạng cho mô hình {model_name}")
             
         end_time = time.perf_counter()
         inference_time = end_time - start_time
@@ -60,13 +66,17 @@ def predict(image: Image.Image, model_name: str) -> PredictionResult:
         logger.info("Bắt đầu tạo ảnh nhiệt (Heatmap generated).")
         
         # Grad-CAM
-        if model_name == "EfficientNet-B0":
+        if is_pytorch:
             gradcam = TorchGradCAM(model)
             input_tensor.requires_grad = True
             heatmap = gradcam.generate_heatmap(input_tensor, target_class=pred_idx)
-        elif model_name == "CNN Custom":
+        elif is_keras:
             gradcam = KerasGradCAM(model)
-            heatmap = gradcam.generate_heatmap(input_numpy, target_class=pred_idx)
+            try:
+                heatmap = gradcam.generate_heatmap(input_numpy, target_class=pred_idx)
+            except Exception as e:
+                logger.warning(f"Lỗi khi tính toán Grad-CAM cho model {model_name}: {e}")
+                heatmap = None
             
         overlayed_img = gradcam.overlay_heatmap(image, heatmap, alpha=0.4) if heatmap is not None else None
         

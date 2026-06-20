@@ -88,6 +88,11 @@ class KerasGradCAM(BaseGradCAM):
         except ImportError:
             return None
             
+        # Tìm nested model (thường là pre-trained base model)
+        for layer in reversed(self.model.layers):
+            if isinstance(layer, tf.keras.Model):
+                return layer
+                
         # Ưu tiên tìm layer tên là 'bottleneck_conv'
         for layer in reversed(self.model.layers):
             if layer.name == 'bottleneck_conv':
@@ -106,22 +111,55 @@ class KerasGradCAM(BaseGradCAM):
         try:
             import tensorflow as tf
             
-            grad_model = tf.keras.models.Model(
-                [self.model.inputs],
-                [self.target_layer.output, self.model.output]
-            )
-
-            with tf.GradientTape() as tape:
-                inputs = tf.cast(input_array, tf.float32)
-                conv_outputs, predictions = grad_model(inputs)
-                
-                if target_class is None:
-                    target_class = tf.argmax(predictions[0])
+            if isinstance(self.target_layer, tf.keras.Model):
+                inner_model = self.target_layer
+                inner_target = None
+                for layer in reversed(inner_model.layers):
+                    if isinstance(layer, tf.keras.layers.Conv2D):
+                        inner_target = layer
+                        break
+                if inner_target is None:
+                    return None
                     
-                if len(predictions[0]) == 1:
-                    loss = predictions[:, 0]
-                else:
-                    loss = predictions[:, target_class]
+                grad_model_inner = tf.keras.models.Model(
+                    [inner_model.inputs],
+                    [inner_target.output, inner_model.output]
+                )
+                
+                with tf.GradientTape() as tape:
+                    inputs = tf.cast(input_array, tf.float32)
+                    conv_outputs, inner_outputs = grad_model_inner(inputs)
+                    
+                    x = inner_outputs
+                    start_idx = self.model.layers.index(self.target_layer) + 1
+                    for layer in self.model.layers[start_idx:]:
+                        x = layer(x)
+                    predictions = x
+                    
+                    if target_class is None:
+                        target_class = tf.argmax(predictions[0])
+                        
+                    if len(predictions[0]) == 1:
+                        loss = predictions[:, 0]
+                    else:
+                        loss = predictions[:, target_class]
+            else:
+                grad_model = tf.keras.models.Model(
+                    [self.model.inputs],
+                    [self.target_layer.output, self.model.output]
+                )
+
+                with tf.GradientTape() as tape:
+                    inputs = tf.cast(input_array, tf.float32)
+                    conv_outputs, predictions = grad_model(inputs)
+                    
+                    if target_class is None:
+                        target_class = tf.argmax(predictions[0])
+                        
+                    if len(predictions[0]) == 1:
+                        loss = predictions[:, 0]
+                    else:
+                        loss = predictions[:, target_class]
 
             grads = tape.gradient(loss, conv_outputs)
             

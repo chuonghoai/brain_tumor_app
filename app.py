@@ -3,7 +3,7 @@ from PIL import Image
 import os
 
 from services.utils import setup_logger
-from services.model_loader import get_available_models, load_model
+from services.model_loader import get_available_models, load_model, MODEL_CONFIG
 from services.predictor import predict
 
 logger = setup_logger("App")
@@ -25,14 +25,11 @@ if "model_ready" not in st.session_state:
 
 # Kiểm tra file model đã tồn tại trong session chưa
 def check_model_exists(model_name: str) -> bool:
+    if model_name not in MODEL_CONFIG:
+        return False
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    if model_name == "EfficientNet-B0":
-        model_path = os.path.join(base_dir, "models", "best_efficientnet_b0.pth")
-        return os.path.exists(model_path)
-    elif model_name == "CNN Custom":
-        model_path = os.path.join(base_dir, "models", "Lan2_best_baseline_cnn_extreme_weights.keras")
-        return os.path.exists(model_path)
-    return False
+    model_path = os.path.join(base_dir, "models", MODEL_CONFIG[model_name])
+    return os.path.exists(model_path)
 st.session_state.model_ready = check_model_exists(st.session_state.selected_model)
 
 def reset_session():

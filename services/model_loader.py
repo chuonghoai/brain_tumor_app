@@ -11,6 +11,13 @@ from .utils import setup_logger
 
 logger = setup_logger("ModelLoader")
 
+MODEL_CONFIG = {
+    "EfficientNet-B0": "best_efficientnet_b0.pth",
+    "CNN Custom": "Lan2_best_baseline_cnn_extreme_weights.keras",
+    "ResNet50V2": "best_resnet_model.keras",
+    "VGG16": "best_vgg16_model.keras"
+}
+
 def create_efficientnet_b0():
     model = efficientnet_b0()
     in_features = model.classifier[1].in_features
@@ -27,19 +34,20 @@ def create_efficientnet_b0():
 def load_model(model_name: str):
     logger.info(f"Bắt đầu tải mô hình: {model_name}")
     
+    if model_name not in MODEL_CONFIG:
+        logger.error(f"Mô hình {model_name} chưa được cấu hình.")
+        raise ValueError(f"Mô hình {model_name} chưa được cấu hình.")
+        
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     models_dir = os.path.join(base_dir, "models")
+    filename = MODEL_CONFIG[model_name]
+    model_path = os.path.join(models_dir, filename)
     
-    """
-    Chọn model để phân tích ảnh
-    """
-    if model_name == "EfficientNet-B0":
-        model_path = os.path.join(models_dir, "best_efficientnet_b0.pth")
+    if not os.path.exists(model_path):
+        logger.error(f"Không tìm thấy file mô hình tại: {model_path}")
+        raise FileNotFoundError(f"Không tìm thấy file trọng số {model_path}")
         
-        if not os.path.exists(model_path):
-            logger.error(f"Không tìm thấy file mô hình tại: {model_path}")
-            raise FileNotFoundError(f"Không tìm thấy file trọng số {model_path}")
-            
+    if filename.endswith(".pth"):
         model = create_efficientnet_b0()
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
@@ -53,23 +61,19 @@ def load_model(model_name: str):
         except Exception as e:
             logger.error(f"Lỗi khi load mô hình PyTorch: {e}")
             raise e
-    elif model_name == "CNN Custom":
-        model_path = os.path.join(models_dir, "Lan2_best_baseline_cnn_extreme_weights.keras")
-        if not os.path.exists(model_path):
-            logger.error(f"Không tìm thấy file mô hình tại: {model_path}")
-            raise FileNotFoundError(f"Không tìm thấy file trọng số {model_path}")
             
+    elif filename.endswith(".keras"):
         try:
             import tensorflow as tf
             model = tf.keras.models.load_model(model_path, compile=False)
-            logger.info("Model Keras loaded thành công.")
+            logger.info(f"Model Keras ({model_name}) loaded thành công.")
             return model
         except Exception as e:
             logger.error(f"Lỗi khi load mô hình Keras: {e}")
             raise e
     else:
-        logger.error(f"Mô hình {model_name} chưa được hỗ trợ.")
-        raise ValueError(f"Mô hình {model_name} hiện chưa được hỗ trợ.")
+        logger.error(f"Định dạng file {filename} của mô hình {model_name} chưa được hỗ trợ.")
+        raise ValueError(f"Định dạng file {filename} hiện chưa được hỗ trợ.")
 
 def get_available_models():
-    return ["EfficientNet-B0", "CNN Custom"]
+    return list(MODEL_CONFIG.keys())

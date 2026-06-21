@@ -1,8 +1,20 @@
-# Bước 1: Tải mã nguồn
+# Bước 1: Tải mã nguồn và file mô hình
+- Tải mã nguồn
 ```powershell
 git pull https://github.com/chuonghoai/brain_tumor_app.git
 cd brain_tumor_app
 ```
+- Tải file mô hình
+    - Tải folder models tại `https://drive.google.com/file/d/1GvILWQIUqR1pjP_V4Xh3yxQc1RPfSKbv/view?usp=sharing`
+    - Giải nén file rar vừa tải vào project `brain_tumor_app`
+    - Cấu trúc thư mục chuẩn:
+        ```
+        |__services/
+        |__models/
+        |__app.py
+        |__.gitignore
+        |__requirements.txt
+        ```
 
 # Bước 2: Tạo môi trường ảo
 - **LƯU Ý:** 
